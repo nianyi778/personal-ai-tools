@@ -12,6 +12,7 @@ description: Use when working on the 静かな旅 Douyin account — starting a 
 | 标题 / 正文 | 一律**日文** |
 | 抖音话题标签 | **最多 5 个** |
 | 封面取帧 | 必须从 `merged.mp4`，**绝对不能**用 `_final.mp4`（已烧字幕） |
+| 封面文字 | 生成后目视确认所有文字清晰可读；标题区背景过亮则换帧或调暗中央渐变 |
 | 字幕样式 | 日文（上）+ 中文（下），PingFang SC 16px，白色描边，无黑底 |
 | 视频时长 | 4:30 ～ 5:30 |
 | 发布前 | 查 発布記録.md，避免重复发布同一素材 |
@@ -71,16 +72,46 @@ ZH_SRT = "/tmp/<地名>_zh.srt"
 脚本自动完成：切片 → concat → 双语字幕对齐 → 烧录 → 输出 `<地名>_<key>_final.mp4`
 
 ### STEP 6 · 制作封面
+
+#### 6a · 取帧
 ```bash
 # 从 merged.mp4 取帧（多取几个，选最美的）
 for t in 20 60 100 150; do
   ffmpeg -y -ss $t -i "~/Downloads/<地名>_clips/<key>/merged.mp4" \
     -vframes 1 /tmp/frame_${t}.png 2>/dev/null
 done
+```
 
+#### 6b · 选帧标准（文字可读性优先）
+优先选**标题区（画面中央 40-60% 高度）自然偏暗**的帧：
+
+| 好帧 ✓ | 差帧 ✗ |
+|--------|--------|
+| 瀑布、水面、树荫、夜景 | 天空、电线杆、白墙建筑 |
+| 画面中央有阴影或景深虚化 | 中央有高亮反光或杂乱元素 |
+| 色调整体偏冷/深 | 大面积浅灰、米白、雪景 |
+
+**如果找不到好帧**，在 cover config 里单独加 `bg_filter` 压暗原图：
+```python
+"bg_filter": "saturate(0.55) brightness(0.65)",  # 亮帧专用
+```
+
+**重要**：`bg_filter` 只作用于 `.bg` 背景层，与文字层完全隔离（文字在 z-index:20，背景在 z-index:0），filter 不会压暗文字。层级结构：
+```
+body
+ ├── .bg               z-index:0  ← filter 在这里，只压背景
+ ├── .gradient-overlay z-index:2  ← 上下渐变遮罩
+ ├── .title-mask       z-index:5  ← 标题区椭圆暗化
+ └── .content          z-index:20 ← 所有文字，不受 filter 影响
+```
+
+#### 6c · 生成 & 验证
+```bash
 # 修改 make_covers.py 顶部 COVERS 列表，填入帧路径和文字
 python3 ~/Downloads/静かな旅/make_covers.py
 ```
+
+**生成后必须目视检查**：日文主标题、英文副标题、三行 mood 文字是否全部清晰可读。若任意文字与背景对比不足，回到 6b 换帧或调参，重新生成。
 
 ### STEP 7 · 撰写文案（日文）
 
