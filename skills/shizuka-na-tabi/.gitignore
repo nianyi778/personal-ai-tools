@@ -1,0 +1,33 @@
+# 视频文件（体积太大，不进 git）
+*.mp4
+*.mov
+*.avi
+*.mkv
+
+# 工作目录（原片/clips/发布包）
+*_clips/
+📦发布包/
+*_work/
+
+# 字幕临时文件
+/tmp/*.srt
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# macOS
+.DS_Store
+.AppleDouble
+
+# 编辑器
+.vscode/
+.idea/
+*.swp
+
+# 本地环境
+.env
+.env.local
