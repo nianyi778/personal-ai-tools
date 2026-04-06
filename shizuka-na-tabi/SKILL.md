@@ -86,7 +86,7 @@ bun ~/.claude/skills/baoyu-youtube-transcript/scripts/main.ts '<URL>' \
 ### STEP 5 · 剪辑（批量脚本）
 复制 `kanazawa_batch.py`，修改顶部三个变量后运行：
 ```python
-VIDEO  = "/Users/likai/Downloads/<地名>.mp4"
+VIDEO  = "~/Downloads/<地名>.mp4"
 JA_SRT = "/tmp/<地名>_ja.srt"
 ZH_SRT = "/tmp/<地名>_zh.srt"
 ```
