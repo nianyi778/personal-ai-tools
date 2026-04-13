@@ -129,23 +129,49 @@ cat ~/Downloads/静かな旅/静かな旅_発布記録.md
 
 **目的：在下载 2-4GB 4K 视频前，确认素材视觉风格符合账号要求。**
 
-```bash
-# 下载最低画质的前60秒样本（通常 < 30MB，1分钟内完成）
-yt-dlp -f "worstvideo[ext=mp4]+worstaudio/worst" \
-  --download-sections "*0-60" \
-  -o /tmp/style_check.mp4 '<URL>' 2>/dev/null
+#### 1.5.1 频道级黑名单检查（第一道关卡）
 
-# 抽取5帧，覆盖不同场景
-for t in 5 15 25 40 55; do
-  ffmpeg -y -ss $t -i /tmp/style_check.mp4 \
-    -vframes 1 /tmp/style_check_${t}s.png 2>/dev/null
+```bash
+# 先查 uploader，命中黑名单直接放弃，不进入后续
+yt-dlp --print "uploader:%(uploader)s channel:%(channel)s" '<URL>' 2>/dev/null
+# 若 uploader/channel 含 "Ambient"/"Ambient Exploration" → 立即放弃
+```
+
+#### 1.5.2 多时间点抽帧（覆盖黎明/中段/亮场景，避免漏检水印）
+
+```bash
+# 从流 URL 直接抽帧（不下载文件，更快更稳）
+URL=$(yt-dlp -f "worstvideo[ext=mp4]+worstaudio/worst/worst" --get-url '<URL>' 2>/dev/null | head -1)
+DURATION=$(yt-dlp --print "%(duration)s" '<URL>' 2>/dev/null)
+
+# 6 个时间点：开头 / 10% / 30% / 50% / 70% / 90%（避免 0-60s 全暗遮蔽水印）
+for frac in 0.02 0.10 0.30 0.50 0.70 0.90; do
+  t=$(python3 -c "print(int($DURATION * $frac))")
+  ffmpeg -y -ss $t -i "$URL" -frames:v 1 -q:v 3 /tmp/style_check_${t}s.jpg 2>/dev/null &
 done
+wait
+```
+
+#### 1.5.3 水印专检：放大左下角区域
+
+```bash
+# 对 50%/70% 位置的帧放大左下角 400×200px（水印常见位置）
+for frac in 0.50 0.70; do
+  t=$(python3 -c "print(int($DURATION * $frac))")
+  ffmpeg -y -ss $t -i "$URL" -frames:v 1 -vf "crop=500:200:0:in_h-200" \
+    -q:v 2 /tmp/style_check_wm_${t}s.png 2>/dev/null &
+done
+wait
+# AI 目视这些放大图 → 任何"半透明水印"一律拒绝
 ```
 
 展示所有帧给用户，逐项检查：
 
 **黑名单频道（直接跳过，不做风格检查）：**
-- **Ambient Exploration** — 全片贯穿底部左角 "ambient" 水印，深色背景时隐形，风格检查无法检出
+- **Ambient Exploration** — 全片贯穿底部左角 "ambient exploration" 水印，**深色背景时隐形，亮场景才暴露**。已知踩坑视频：
+  - `NGBAJw1jeXA`（白川乡）、`dVemOMMb_ek`（飛騨古川）、`_N30PVMDRTM`（小豆島）、`uXVXZ8eozv4`（东山）
+  - `oE9_iDJkNTI`（上高地黎明） — 2026-04-13 踩坑，竖屏裁切抢救
+  - **频道级拉黑**：yt-dlp `--get-filename --print "%(uploader)s"` 检查 uploader 字段，含 "Ambient" 一律跳过
 - **任何含博主口播/导游解说/频道报幕的频道** — 音频检查不通过一律拉黑
 
 | 检查项 | ✓ 合格 | ✗ 不合格（放弃） |
